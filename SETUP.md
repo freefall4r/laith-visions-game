@@ -67,6 +67,14 @@ and bump `CONFIG.photoCount`. The optimizer that shrank Laith's originals is the
 
 ---
 
+## Installable app (PWA)
+The link is also an installable app — it works fullscreen with its own icon, no
+browser bars, and loads instantly (even offline after the first visit).
+- **iPhone:** open the link in Safari → Share → **Add to Home Screen**.
+- **Android:** open in Chrome → menu (⋮) → **Install app / Add to Home screen**.
+
+Laith can tell followers to "add it to your home screen" for a real-app feel.
+
 ## How the contest runs each month
 1. Laith posts a story: "Play my game, beat the high score, win a free session
    👉 link in bio."
