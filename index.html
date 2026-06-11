@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Laith Visions — Capture the Shot</title>
+
+<!-- ===================================================================
+     CONFIG  —  EDIT THIS BLOCK ONLY.
+==================================================================== -->
+<script>
+const CONFIG = {
+  // --- Brand ---
+  brandName:   "LAITH VISIONS",
+  wordmark:    "Laith Visions",        // elegant serif version on the home screen
+  instagram:   "@laith_visions",
+  tagline:     "Pull focus. Catch the moment. Take the shot.",
+
+  // --- Monochrome editorial palette — photos carry the color ---
+  accent:      "#ffffff",              // crisp white highlight
+  accent2:     "#ff5a5f",              // miss / blurred feedback only
+  bg:          "#0a0a0b",              // near-black, cinematic
+
+  logo:        "",                     // optional: "logo.png" next to index.html
+
+  // --- Photos: drop 1.jpg … 25.jpg into a /photos folder next to this file ---
+  photoCount:  17,
+  photoPath:   "photos/",
+  photoExt:    "jpg",
+
+  // --- The prize / contest ---
+  prizeShort:  "Free photo session",
+  prizeRule:   "Highest score by June 30 wins a FREE session with Laith Visions.",
+  monthLabel:  "JUNE",
+
+  // --- Supabase (LIVE global leaderboard). Leave blank to use on-device scores. ---
+  supabaseUrl: "",
+  supabaseKey: "",
+};
+</script>
+
+<style>
+  :root{
+    --accent:#ffffff; --accent2:#ff5a5f; --bg:#0a0a0b;
+    --ink:#f2f0ec; --muted:#928f88;
+    --serif:"Hoefler Text",Georgia,"Times New Roman",serif;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    overflow:hidden; user-select:none; -webkit-user-select:none; touch-action:manipulation;
+  }
+  #app{ position:fixed; inset:0; display:flex; flex-direction:column;
+        max-width:520px; margin:0 auto; }
+
+  .screen{ position:absolute; inset:0; display:none; flex-direction:column;
+           padding:env(safe-area-inset-top) 24px env(safe-area-inset-bottom); }
+  .screen.active{ display:flex; }
+  .vignette{ position:absolute; inset:0; pointer-events:none;
+    background:radial-gradient(120% 90% at 50% 38%, transparent 48%, rgba(0,0,0,.7) 100%); }
+
+  /* ---------- EDITORIAL LANDING ---------- */
+  #start{ padding:0; }
+  .hero{ position:absolute; inset:0; z-index:0; background:#000; overflow:hidden; }
+  .hslide{ position:absolute; inset:0; background-size:cover; background-position:center top;
+           opacity:0; transition:opacity 1.6s ease; transform:scale(1.06); }
+  .hslide.on{ opacity:1; animation:kb 9s ease-out forwards; }
+  @keyframes kb{ from{transform:scale(1.06)} to{transform:scale(1.16)} }
+  .hero-grad{ position:absolute; inset:0; z-index:1; pointer-events:none;
+    background:linear-gradient(180deg, rgba(10,10,11,.55) 0%, rgba(10,10,11,.08) 30%,
+      rgba(10,10,11,.5) 64%, rgba(10,10,11,.97) 100%); }
+  .grain{ position:absolute; inset:0; z-index:2; pointer-events:none; opacity:.06; mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  .frame{ position:absolute; inset:14px; z-index:3; pointer-events:none; border:1px solid rgba(255,255,255,.3); }
+  .land{ position:relative; z-index:4; display:flex; flex-direction:column; height:100%;
+    padding: calc(env(safe-area-inset-top) + 30px) 32px calc(env(safe-area-inset-bottom) + 22px); }
+  .masthead{ display:flex; justify-content:space-between; align-items:center; }
+  .masthead img{ max-height:34px; }
+  .masthead .wm{ font-family:var(--serif); font-style:italic; font-size:23px; letter-spacing:.5px; }
+  .masthead .est{ font-size:9px; letter-spacing:3px; color:rgba(255,255,255,.65); }
+  .land-mid{ margin-top:auto; }
+  .land-mid .kicker{ font-size:10px; letter-spacing:6px; color:var(--accent); margin-bottom:16px; }
+  .lead{ font-weight:200; font-size:clamp(46px,15.5vw,76px); line-height:.9; letter-spacing:3px;
+         text-shadow:0 4px 30px rgba(0,0,0,.5); }
+  .lead b{ font-weight:800; }
+  .land-mid .sub{ color:rgba(255,255,255,.85); margin-top:18px; font-size:14px; line-height:1.5; max-width:80%; }
+  .land-bottom{ margin-top:26px; }
+  .prize-tag{ display:inline-block; font-size:11px; letter-spacing:1.5px; color:var(--ink);
+    border:1px solid var(--accent); border-radius:30px; padding:9px 15px; margin-bottom:10px;
+    background:rgba(255,255,255,.08); text-transform:uppercase; }
+  .rule-line{ color:rgba(255,255,255,.6); font-size:12px; margin-bottom:16px; line-height:1.4; }
+  .land-bottom .footnote{ text-align:left; color:rgba(255,255,255,.55); margin:14px 0 0; }
+  .land-bottom .footnote b{ color:var(--accent); }
+
+  /* ---- game-style controls ---- */
+  .play{ position:relative; width:100%; border:none; cursor:pointer;
+    background:linear-gradient(180deg,#ffffff,#ededea); color:#0a0a0b;
+    font-weight:900; font-size:21px; letter-spacing:4px; padding:20px;
+    border-radius:18px; display:flex; align-items:center; justify-content:center; gap:12px;
+    box-shadow:0 6px 0 #a8a59c, 0 12px 26px rgba(255,255,255,.22);
+    transition:transform .07s ease, box-shadow .07s ease; -webkit-tap-highlight-color:transparent; }
+  .play:active{ transform:translateY(6px); box-shadow:0 0 0 #a8a59c, 0 4px 12px rgba(0,0,0,.45); }
+  .play .tri{ font-size:15px; transform:translateY(1px); }
+  .play .pulse{ position:absolute; inset:0; border-radius:18px; border:2px solid var(--accent);
+    pointer-events:none; animation:playpulse 1.7s ease-out infinite; }
+  @keyframes playpulse{ 0%{transform:scale(1); opacity:.65} 100%{transform:scale(1.09); opacity:0} }
+  .chips{ display:flex; gap:10px; margin-top:14px; }
+  .chip{ flex:1; display:flex; align-items:center; justify-content:center; gap:7px;
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.18);
+    border-radius:12px; padding:13px 10px; color:var(--ink); font-weight:700;
+    font-size:12px; letter-spacing:1.2px; cursor:pointer;
+    transition:transform .06s, background .2s; }
+  .chip:active{ transform:translateY(2px); background:rgba(255,255,255,.12); }
+  .chip .ic{ color:var(--accent); font-size:14px; }
+  .chip b{ color:var(--accent); margin-left:3px; }
+
+  /* ---------- START ---------- */
+  .brand{ display:flex; flex-direction:column; align-items:center; gap:4px; margin-top:9vh; }
+  .brand img{ max-width:170px; max-height:90px; object-fit:contain; }
+  .brand .wm{ font-family:var(--serif); font-style:italic; font-size:30px; letter-spacing:1px; }
+  .brand .kicker{ font-size:10px; letter-spacing:5px; color:var(--muted); }
+  .title{ text-align:center; margin-top:7vh; }
+  .title .big{ font-size:clamp(36px,12vw,56px); font-weight:300; line-height:.95;
+               letter-spacing:6px; }
+  .title .big b{ font-weight:800; }
+  .title .sub{ color:var(--muted); margin-top:14px; font-size:14px; letter-spacing:.3px; }
+
+  .prize{ margin:auto 0; background:rgba(255,255,255,.04);
+          border:1px solid rgba(255,255,255,.09); border-radius:16px; padding:18px;
+          text-align:center; }
+  .prize .label{ color:var(--accent); font-size:11px; letter-spacing:3px; font-weight:700; }
+  .prize .rule{ margin-top:8px; font-size:15px; line-height:1.4; }
+
+  .btn{ border:none; border-radius:13px; padding:18px; font-size:16px; font-weight:700;
+        letter-spacing:1.5px; cursor:pointer; color:#16140e;
+        background:linear-gradient(180deg,#fff,var(--accent)); }
+  .btn:active{ transform:translateY(1px); }
+  .btn.ghost{ background:transparent; color:var(--ink); border:1px solid rgba(255,255,255,.2); }
+  .stack{ display:flex; flex-direction:column; gap:11px; margin-bottom:14px; }
+  .footnote{ text-align:center; color:var(--muted); font-size:12px; margin-bottom:8px; }
+  .footnote b{ color:var(--accent); font-weight:600; }
+
+  /* ---------- GAME ---------- */
+  #game{ padding:0; }
+  #photo{ position:absolute; inset:0; background-size:cover; background-position:center;
+          filter:blur(16px) brightness(.62) saturate(.85); transform:scale(1.08);
+          transition:filter .12s linear, transform .12s linear; z-index:0; }
+  #photoTint{ position:absolute; inset:0; z-index:1; pointer-events:none;
+    background:linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.15) 40%, rgba(0,0,0,.55)); }
+  .hud{ position:absolute; top:0; left:0; right:0; z-index:6;
+        display:flex; justify-content:space-between; align-items:flex-start;
+        padding:calc(env(safe-area-inset-top) + 16px) 20px 0;
+        text-shadow:0 2px 10px rgba(0,0,0,.7); }
+  .score{ font-size:36px; font-weight:800; }
+  .combo{ font-size:12px; color:var(--accent); font-weight:700; height:16px; letter-spacing:.5px; }
+  .meta{ text-align:right; }
+  .lives{ display:flex; gap:6px; justify-content:flex-end; }
+  .life{ width:21px; height:21px; transition:opacity .25s, transform .25s; }
+  .life.lost{ opacity:.2; transform:scale(.7); }
+  .shotn{ font-size:11px; color:var(--muted); margin-top:6px; letter-spacing:1px; }
+
+  .stage{ position:absolute; inset:0; z-index:5; display:flex; align-items:center; justify-content:center; }
+  .target,.focus{ position:absolute; border-radius:50%; left:50%; top:50%; transform:translate(-50%,-50%); }
+  .target{ width:150px; height:150px; border:2px solid rgba(255,255,255,.55); }
+  .target::before,.target::after{ content:""; position:absolute; background:var(--accent);
+       width:2px; height:14px; left:50%; transform:translateX(-50%); }
+  .target::before{ top:-9px } .target::after{ bottom:-9px }
+  .focus{ border:3px solid #fff; box-shadow:0 0 26px rgba(255,255,255,.35),
+          0 0 26px rgba(255,255,255,.4) inset; }
+  .brackets{ position:absolute; inset:20px; z-index:5; pointer-events:none; }
+  .br{ position:absolute; width:28px; height:28px; border:2px solid rgba(255,255,255,.4); }
+  .br.tl{ top:0; left:0; border-right:none; border-bottom:none }
+  .br.tr{ top:0; right:0; border-left:none; border-bottom:none }
+  .br.bl{ bottom:0; left:0; border-right:none; border-top:none }
+  .br.br2{ bottom:0; right:0; border-left:none; border-top:none }
+  .recdot{ position:absolute; top:calc(env(safe-area-inset-top) + 18px); left:50%;
+    transform:translateX(-50%); z-index:6; font-size:11px; letter-spacing:2px; color:#fff;
+    display:flex; align-items:center; gap:6px; opacity:.8; }
+  .recdot i{ width:8px;height:8px;border-radius:50%;background:var(--accent2);
+    animation:blink 1s steps(2) infinite; }
+  @keyframes blink{ 50%{opacity:.2} }
+
+  .judge{ position:absolute; left:50%; top:34%; transform:translate(-50%,-50%);
+          font-size:28px; font-weight:800; opacity:0; pointer-events:none; z-index:7;
+          text-shadow:0 2px 14px rgba(0,0,0,.8); letter-spacing:1px; }
+  .hint{ position:absolute; bottom:10%; left:0; right:0; text-align:center; z-index:6;
+         color:rgba(255,255,255,.8); font-size:14px; text-shadow:0 2px 10px rgba(0,0,0,.8); }
+  .flash{ position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:9; }
+
+  /* ---------- GAME OVER ---------- */
+  #over{ overflow-y:auto; }
+  .final{ text-align:center; margin-top:4vh; }
+  .final .lbl{ color:var(--muted); letter-spacing:3px; font-size:11px; }
+  .final .val{ font-size:62px; font-weight:800; line-height:1;
+               background:linear-gradient(180deg,#fff,var(--accent));
+               -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .best{ color:var(--accent); font-size:13px; margin-top:6px; }
+
+  .share-card{ margin:16px auto; border-radius:16px; overflow:hidden;
+               box-shadow:0 14px 44px rgba(0,0,0,.55); width:100%; max-width:300px; }
+  .share-card canvas{ width:100%; display:block; }
+
+  .nameRow{ display:flex; gap:8px; margin:8px 0 4px; }
+  .nameRow input{ flex:1; background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.15); border-radius:12px; padding:14px;
+    color:var(--ink); font-size:16px; }
+  .nameRow input:focus{ outline:none; border-color:var(--accent); }
+
+  .lb{ margin-top:18px; }
+  .lb h3{ font-size:12px; letter-spacing:3px; color:var(--muted); text-align:center; margin-bottom:10px; }
+  .lb h3 b{ color:var(--accent); }
+  .row{ display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:12px;
+        background:rgba(255,255,255,.03); margin-bottom:6px; }
+  .row.me{ background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.35); }
+  .rank{ width:28px; font-weight:800; color:var(--muted); }
+  .row.top .rank{ color:var(--accent); }
+  .rname{ flex:1; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rscore{ font-weight:800; }
+  .loading{ text-align:center; color:var(--muted); padding:14px; font-size:14px; }
+
+  .toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+          background:#fff; color:#111; padding:12px 18px; border-radius:30px;
+          font-weight:700; font-size:14px; opacity:0; transition:opacity .3s, transform .3s;
+          z-index:20; pointer-events:none; }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(-4px); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== START (editorial landing) ===== -->
+  <section id="start" class="screen active">
+    <div class="hero" id="hero"></div>
+    <div class="hero-grad"></div>
+    <div class="grain"></div>
+    <div class="frame"></div>
+    <div class="land">
+      <header class="masthead">
+        <img id="logoImg" alt="" style="display:none" />
+        <span class="wm" id="wordmark">Laith Visions</span>
+        <span class="est">PHOTOGRAPHY · AMMAN</span>
+      </header>
+
+      <div class="land-mid">
+        <div class="kicker">PLAY · CAPTURE · WIN</div>
+        <h1 class="lead">CAPTURE<br><b>THE SHOT</b></h1>
+        <p class="sub" id="tagline"></p>
+      </div>
+
+      <div class="land-bottom">
+        <div class="prize-tag">★ <span id="prizeShort"></span> · <span id="prizeMonth"></span></div>
+        <p class="rule-line" id="prizeRule"></p>
+
+        <button class="play" onclick="Game.start()">
+          <span class="tri">▶</span><span class="ptxt">PLAY</span>
+          <span class="pulse"></span>
+        </button>
+        <div class="chips">
+          <button class="chip" onclick="show('over'); Board.render(0,true)"><span class="ic">🏆</span> LEADERBOARD</button>
+          <button class="chip" onclick="show('over'); Board.render(0,true)"><span class="ic">★</span> BEST <b id="bestChip">0</b></button>
+        </div>
+
+        <div class="footnote">Shoot Laith's portfolio as you play. Share &amp; tag <b id="igFoot"></b> to qualify.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== GAME ===== -->
+  <section id="game" class="screen">
+    <div id="photo"></div>
+    <div id="photoTint"></div>
+    <div class="recdot"><i></i> CAPTURING</div>
+    <div class="hud">
+      <div>
+        <div class="score" id="hudScore">0</div>
+        <div class="combo" id="hudCombo"></div>
+      </div>
+      <div class="meta">
+        <div class="lives" id="hudLives"></div>
+        <div class="shotn" id="shotN">SHOT 1 / 25</div>
+      </div>
+    </div>
+    <div class="brackets"><i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br br2"></i></div>
+    <div class="stage">
+      <div class="target"></div>
+      <div class="focus" id="focus"></div>
+      <div class="judge" id="judge"></div>
+    </div>
+    <div class="hint" id="hint">Tap when the ring lines up to pull focus</div>
+    <div class="flash" id="flash"></div>
+  </section>
+
+  <!-- ===== GAME OVER ===== -->
+  <section id="over" class="screen">
+    <div class="final">
+      <div class="lbl">YOUR SCORE</div>
+      <div class="val" id="finalScore">0</div>
+      <div class="best" id="bestLine"></div>
+    </div>
+    <div class="share-card"><canvas id="card" width="540" height="960"></canvas></div>
+    <div class="stack" style="margin-top:0">
+      <button class="btn" id="shareBtn" onclick="shareCard()">📸 SHARE TO STORY</button>
+      <button class="btn ghost" onclick="Game.start()">PLAY AGAIN</button>
+    </div>
+    <div class="nameRow">
+      <input id="playerName" maxlength="16" placeholder="Your name for the leaderboard" />
+      <button class="btn" style="padding:14px 16px;font-size:14px" onclick="submitScore()">SAVE</button>
+    </div>
+    <div class="lb">
+      <h3><b id="monthLabel"></b> LEADERBOARD</h3>
+      <div id="lbList"><div class="loading">Loading…</div></div>
+      <button class="btn ghost" style="margin:14px 0" onclick="show('start')">◀ HOME</button>
+    </div>
+  </section>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== SETUP ===================== */
+// Live month — the contest auto-resets on the 1st (only this month's scores count)
+const MN=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+const _now=new Date();
+const CUR_MONTH=MN[_now.getMonth()];
+const CUR_MONTH_TITLE=CUR_MONTH.charAt(0)+CUR_MONTH.slice(1).toLowerCase();
+const MONTH_START=new Date(_now.getFullYear(),_now.getMonth(),1).toISOString();
+const MONTH_START_MS=Date.parse(MONTH_START);
+CONFIG.monthLabel=CUR_MONTH;
+CONFIG.prizeRule=`Top score in ${CUR_MONTH_TITLE} wins a FREE session with ${CONFIG.wordmark}. Resets the 1st.`;
+
+document.documentElement.style.setProperty('--accent', CONFIG.accent);
+document.documentElement.style.setProperty('--accent2', CONFIG.accent2);
+document.documentElement.style.setProperty('--bg', CONFIG.bg);
+wordmark.textContent = CONFIG.wordmark;
+tagline.textContent  = CONFIG.tagline;
+prizeRule.textContent= CONFIG.prizeRule;
+prizeShort.textContent = CONFIG.prizeShort;
+prizeMonth.textContent = CONFIG.monthLabel;
+igFoot.textContent   = CONFIG.instagram;
+monthLabel.textContent = CONFIG.monthLabel + " ";
+if (CONFIG.logo){ logoImg.src=CONFIG.logo; logoImg.style.display='block'; wordmark.style.display='none'; }
+
+// Editorial hero slideshow — Laith's strongest shots, slow cinematic crossfade
+(function(){
+  const hero=document.getElementById('hero'); if(!hero) return;
+  const HERO=[8,1,7,14];                       // curated portfolio picks
+  HERO.forEach((n,i)=>{ const d=document.createElement('div');
+    d.className='hslide'+(i===0?' on':'');
+    d.style.backgroundImage='url('+CONFIG.photoPath+n+'.'+CONFIG.photoExt+')';
+    hero.appendChild(d); });
+  const s=hero.children; if(s.length<2) return; let i=0;
+  setInterval(()=>{ s[i].classList.remove('on'); i=(i+1)%s.length; s[i].classList.add('on'); }, 4200);
+})();
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(id==='start') updateBest();
+}
+function updateBest(){ const b=document.getElementById('bestChip');
+  if(b) b.textContent = +(localStorage.getItem('cts_best')||0); }
+updateBest();
+function toast(msg){ const t=toastEl; t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2200); }
+const toastEl=document.getElementById('toast');
+
+/* ===================== PHOTOS (drop-in folder, placeholder fallback) ===================== */
+const PHOTOS = [];   // resolved srcs (real file or generated placeholder dataURL)
+function placeholder(i){
+  const c=document.createElement('canvas'); c.width=600; c.height=800;
+  const x=c.getContext('2d');
+  const hue=(i*47)%360;
+  const g=x.createLinearGradient(0,0,600,800);
+  g.addColorStop(0,`hsl(${hue},28%,16%)`); g.addColorStop(1,`hsl(${(hue+40)%360},30%,7%)`);
+  x.fillStyle=g; x.fillRect(0,0,600,800);
+  x.strokeStyle='rgba(255,255,255,.12)'; x.lineWidth=3;
+  x.strokeRect(30,30,540,740);
+  x.fillStyle='rgba(255,255,255,.85)'; x.textAlign='center';
+  x.font='italic 40px Georgia'; x.fillText('Laith Visions', 300, 380);
+  x.fillStyle=CONFIG.accent; x.font='700 22px -apple-system';
+  x.fillText('SHOT '+String(i).padStart(2,'0'), 300, 430);
+  x.fillStyle='rgba(255,255,255,.4)'; x.font='14px -apple-system';
+  x.fillText('drop photo '+i+'.'+CONFIG.photoExt+' here', 300, 470);
+  return c.toDataURL();
+}
+function loadPhotos(){
+  for(let i=1;i<=CONFIG.photoCount;i++){
+    const idx=i-1, url=CONFIG.photoPath+i+'.'+CONFIG.photoExt, img=new Image();
+    PHOTOS[idx]=placeholder(i);              // default until a real file proves it exists
+    img.onload=()=>{ PHOTOS[idx]=url; };
+    img.onerror=()=>{};
+    img.src=url;
+  }
+}
+loadPhotos();
+
+/* ===================== GAME ===================== */
+const Game = (() => {
+  const focusEl=document.getElementById('focus'), judgeEl=document.getElementById('judge'),
+        photoEl=document.getElementById('photo');
+  const TARGET=150, START=475;
+  let dia,speed,score,combo,lives,running,lastT,raf,pIndex,captured;
+
+  function setLives(n){
+    hudLives.innerHTML='';
+    for(let i=0;i<3;i++){
+      const s=document.createElementNS('http://www.w3.org/2000/svg','svg');
+      s.setAttribute('viewBox','0 0 24 24'); s.classList.add('life'); if(i>=n)s.classList.add('lost');
+      s.innerHTML='<path fill="'+CONFIG.accent+'" d="M9 3l-1.5 2H4a2 2 0 00-2 2v11a2 2 0 002 2h16a2 2 0 002-2V7a2 2 0 00-2-2h-3.5L15 3H9zm3 5a5 5 0 110 10 5 5 0 010-10z"/>';
+      hudLives.appendChild(s);
+    }
+  }
+  function setPhoto(i){
+    photoEl.style.transition='none';
+    photoEl.style.filter='blur(16px) brightness(.62) saturate(.85)';
+    photoEl.style.transform='scale(1.08)';
+    photoEl.style.backgroundImage='url('+PHOTOS[i]+')';
+    shotN.textContent='SHOT '+(i+1)+' / '+CONFIG.photoCount;
+  }
+  function develop(){ // snap into focus = captured
+    photoEl.style.transition='filter .18s ease-out, transform .25s ease-out';
+    photoEl.style.filter='blur(0px) brightness(1) saturate(1.05)';
+    photoEl.style.transform='scale(1)';
+  }
+  function start(){
+    dia=START; speed=235; score=0; combo=0; lives=3; running=true; lastT=0;
+    pIndex=0; captured=PHOTOS[0];
+    hudScore.textContent='0'; hudCombo.textContent=''; setLives(3);
+    hint.style.opacity=1; setPhoto(0); show('game');
+    cancelAnimationFrame(raf); raf=requestAnimationFrame(loop);
+  }
+  function loop(t){
+    if(!running)return; if(!lastT)lastT=t;
+    const dt=Math.min((t-lastT)/1000,.05); lastT=t;
+    dia-=speed*dt;
+    if(dia<=46) miss(true);
+    focusEl.style.width=focusEl.style.height=Math.max(dia,46)+'px';
+    raf=requestAnimationFrame(loop);
+  }
+  function judge(txt,color){
+    judgeEl.textContent=txt; judgeEl.style.color=color;
+    judgeEl.style.transition='none'; judgeEl.style.opacity='1';
+    judgeEl.style.transform='translate(-50%,-50%) scale(1.25)';
+    requestAnimationFrame(()=>{ judgeEl.style.transition='opacity .5s, transform .5s';
+      judgeEl.style.opacity='0'; judgeEl.style.transform='translate(-50%,-50%) scale(1)'; });
+  }
+  function flashFX(){ flash.style.transition='none'; flash.style.opacity='.85';
+    requestAnimationFrame(()=>{ flash.style.transition='opacity .4s'; flash.style.opacity='0'; }); }
+  function nextPhoto(){
+    pIndex=(pIndex+1)%CONFIG.photoCount;
+    setTimeout(()=>{ if(running) setPhoto(pIndex); }, 280);
+  }
+  function tap(){
+    if(!running)return; hint.style.opacity=0;
+    const diff=Math.abs(dia-TARGET)/2;
+    if(diff<7){ hit(100,'PERFECT!',CONFIG.accent); flashFX(); develop(); captured=PHOTOS[pIndex]; nextPhoto(); }
+    else if(diff<18){ hit(60,'NICE',CONFIG.accent); develop(); captured=PHOTOS[pIndex]; nextPhoto(); }
+    else if(diff<32){ hit(30,'SOFT','#dcd7c9'); combo=0; develop(); captured=PHOTOS[pIndex]; nextPhoto(); }
+    else { miss(false); }
+  }
+  function hit(base,txt,color){
+    combo++; const mult=1+Math.floor(combo/3)*0.25;
+    score+=Math.round(base*mult); hudScore.textContent=score;
+    hudCombo.textContent= combo>1 ? ('🔥 '+combo+' in a row  ×'+mult.toFixed(2)) : '';
+    judge(txt,color); speed=Math.min(speed+10,620); dia=START;
+  }
+  function miss(timeout){
+    combo=0; hudCombo.textContent=''; lives--; setLives(lives);
+    document.querySelector('.stage').animate(
+      [{transform:'translateX(0)'},{transform:'translateX(-9px)'},{transform:'translateX(9px)'},{transform:'translateX(0)'}],{duration:180});
+    judge(timeout?'BLURRED':'MISSED',CONFIG.accent2); dia=START;
+    if(lives<=0) end();
+  }
+  function end(){ running=false; cancelAnimationFrame(raf);
+    setTimeout(()=>overScreen(score, captured), 360); }
+  document.getElementById('game').addEventListener('pointerdown', e=>{ e.preventDefault(); tap(); });
+  return { start };
+})();
+
+/* ===================== GAME OVER + CARD ===================== */
+let lastScore=0, lastPhoto=null;
+function bestScore(){ return +(localStorage.getItem('cts_best')||0); }
+function overScreen(s, photoSrc){
+  lastScore=s; lastPhoto=photoSrc;
+  finalScore.textContent=s;
+  const best=bestScore();
+  if(s>best){ localStorage.setItem('cts_best',s); bestLine.textContent='🎉 New personal best!'; }
+  else bestLine.textContent='Your best: '+best;
+  const saved=localStorage.getItem('cts_name'); if(saved) playerName.value=saved;
+  drawCard(s, photoSrc); show('over'); Board.render(s,false);
+}
+
+function drawCard(score, photoSrc){
+  const c=document.getElementById('card'), x=c.getContext('2d'), W=c.width, H=c.height;
+  const paint=()=>{
+    // dark gradient base
+    x.fillStyle=CONFIG.bg; x.fillRect(0,0,W,H);
+    const g=x.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'rgba(0,0,0,.45)'); g.addColorStop(.5,'rgba(0,0,0,.25)'); g.addColorStop(1,'rgba(0,0,0,.85)');
+    x.fillStyle=g; x.fillRect(0,0,W,H);
+    // brackets
+    x.strokeStyle='rgba(255,255,255,.55)'; x.lineWidth=4; const m=46,b=46;
+    brk(x,m,m,1,1,b); brk(x,W-m,m,-1,1,b); brk(x,m,H-m,1,-1,b); brk(x,W-m,H-m,-1,-1,b);
+    // wordmark
+    x.textAlign='center'; x.fillStyle='#fff';
+    x.font='italic 34px Georgia'; x.fillText(CONFIG.wordmark, W/2, 110);
+    x.fillStyle=CONFIG.accent; x.font='600 15px -apple-system';
+    x.fillText('C A P T U R E   T H E   S H O T', W/2, 142);
+    // score
+    x.fillStyle='rgba(255,255,255,.65)'; x.font='600 22px -apple-system'; x.fillText('I SCORED', W/2, H*0.50);
+    x.fillStyle=CONFIG.accent; x.font='800 150px -apple-system,Helvetica'; x.fillText(String(score), W/2, H*0.50+130);
+    // challenge
+    x.fillStyle='#fff'; x.font='700 30px -apple-system'; x.fillText('Can you beat me?', W/2, H*0.70);
+    x.fillStyle='rgba(255,255,255,.78)'; x.font='400 21px -apple-system';
+    wrap(x, CONFIG.prizeRule, W/2, H*0.755, 28, W-120);
+    // CTA
+    x.fillStyle=CONFIG.accent; x.font='800 28px -apple-system';
+    x.fillText('Tag '+CONFIG.instagram+' to win', W/2, H*0.90);
+  };
+  // composite the captured photo behind everything when it's safe (deployed, or a placeholder dataURL)
+  const safe = !photoSrc ? false : (photoSrc.startsWith('data:') || location.protocol!=='file:');
+  if(safe){
+    const img=new Image();
+    img.onload=()=>{ // cover-fit
+      const r=Math.max(W/img.width, H/img.height), iw=img.width*r, ih=img.height*r;
+      x.drawImage(img,(W-iw)/2,(H-ih)/2,iw,ih); paint();
+    };
+    img.onerror=paint; img.src=photoSrc;
+  } else paint();
+}
+function brk(x,px,py,sx,sy,len){ x.beginPath(); x.moveTo(px,py+sy*len); x.lineTo(px,py); x.lineTo(px+sx*len,py); x.stroke(); }
+function wrap(x,text,cx,cy,lh,maxW){
+  const words=text.split(' '); let line='',y=cy;
+  for(const w of words){ const t=line+w+' ';
+    if(x.measureText(t).width>maxW && line){ x.fillText(line,cx,y); line=w+' '; y+=lh; } else line=t; }
+  x.fillText(line,cx,y);
+}
+
+async function shareCard(){
+  document.getElementById('card').toBlob(async(blob)=>{
+    if(!blob){ toast('Could not build image — try again.'); return; }
+    const file=new File([blob],'laith-visions-score.png',{type:'image/png'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file],
+        text:`I scored ${lastScore} on Laith Visions — Capture the Shot! Beat me & win a free session ${CONFIG.instagram}`}); return;
+      }catch(e){}
+    }
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='laith-visions-score.png'; a.click();
+    toast('Saved! Post it to your IG story.');
+  },'image/png');
+}
+
+/* ===================== LEADERBOARD ===================== */
+const Board = (() => {
+  let sb=null;
+  if(CONFIG.supabaseUrl && CONFIG.supabaseKey){
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+    s.onload=()=>{ sb=window.supabase.createClient(CONFIG.supabaseUrl,CONFIG.supabaseKey); };
+    document.head.appendChild(s);
+  }
+  function local(){ try{ return JSON.parse(localStorage.getItem('cts_board')||'[]'); }catch(e){ return []; } }
+  function saveLocal(a){ localStorage.setItem('cts_board', JSON.stringify(a.slice(0,50))); }
+  async function fetchTop(){
+    if(sb){ const {data,error}=await sb.from('scores').select('name,score')
+        .gte('created_at',MONTH_START).order('score',{ascending:false}).limit(20);
+      if(!error&&data) return data; }
+    return local().filter(r=>(r.t||0)>=MONTH_START_MS).sort((a,b)=>b.score-a.score).slice(0,20);
+  }
+  async function submit(name,score){ name=(name||'Anon').slice(0,16);
+    if(sb){ try{ await sb.from('scores').insert({name,score}); }catch(e){} }
+    const a=local(); a.push({name,score,t:Date.now()}); saveLocal(a);
+  }
+  async function render(myScore,fromHome){
+    const list=document.getElementById('lbList'); list.innerHTML='<div class="loading">Loading…</div>';
+    const rows=await fetchTop();
+    if(!rows.length){ list.innerHTML='<div class="loading">No scores yet — be the first!</div>'; return; }
+    const myName=localStorage.getItem('cts_name');
+    list.innerHTML=rows.map((r,i)=>{ const me=!fromHome&&r.name===myName&&r.score===myScore;
+      return `<div class="row ${i<3?'top':''} ${me?'me':''}"><div class="rank">${i<3?['🥇','🥈','🥉'][i]:'#'+(i+1)}</div>
+        <div class="rname">${esc(r.name)}</div><div class="rscore">${r.score}</div></div>`; }).join('');
+  }
+  function esc(s){ return String(s).replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])); }
+  return { fetchTop, submit, render };
+})();
+
+async function submitScore(){
+  const name=playerName.value.trim()||'Anon';
+  localStorage.setItem('cts_name',name);
+  await Board.submit(name,lastScore); toast('Saved to the leaderboard!'); Board.render(lastScore,false);
+}
+document.addEventListener('gesturestart', e=>e.preventDefault());
+</script>
+</body>
+</html>
