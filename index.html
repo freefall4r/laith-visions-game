@@ -193,7 +193,9 @@ const CONFIG = {
   .lives{ display:flex; gap:6px; justify-content:flex-end; }
   .life{ width:21px; height:21px; transition:opacity .25s, transform .25s; }
   .life.lost{ opacity:.2; transform:scale(.7); }
-  .shotn{ font-size:11px; color:var(--muted); margin-top:6px; letter-spacing:1px; }
+  .shotn{ font-size:12px; color:var(--ink); margin-top:6px; letter-spacing:1px; font-weight:700; }
+  .pbar{ position:absolute; top:0; left:0; right:0; height:3px; z-index:6; background:rgba(255,255,255,.15); }
+  .pbar i{ display:block; height:100%; width:0; background:#fff; transition:width .25s ease; }
 
   .stage{ position:absolute; inset:0; z-index:5; display:flex; align-items:center; justify-content:center; }
   .target,.focus{ position:absolute; border-radius:50%; left:50%; top:50%; transform:translate(-50%,-50%); }
@@ -230,7 +232,9 @@ const CONFIG = {
   .final .val{ font-size:62px; font-weight:800; line-height:1;
                background:linear-gradient(180deg,#fff,var(--accent));
                -webkit-background-clip:text; background-clip:text; color:transparent; }
-  .best{ color:var(--accent); font-size:13px; margin-top:6px; }
+  .acc{ font-size:15px; font-weight:800; letter-spacing:1.5px; margin-top:10px; color:#fff; }
+  .acc b{ color:#fff; }
+  .best{ color:var(--muted); font-size:13px; margin-top:8px; }
 
   .share-card{ margin:16px auto; border-radius:16px; overflow:hidden;
                box-shadow:0 14px 44px rgba(0,0,0,.55); width:100%; max-width:300px; }
@@ -312,14 +316,14 @@ const CONFIG = {
     <div id="photo"></div>
     <div id="photoTint"></div>
     <div class="recdot"><i></i> CAPTURING</div>
+    <div class="pbar"><i id="pfill"></i></div>
     <div class="hud">
       <div>
         <div class="score" id="hudScore">0</div>
         <div class="combo" id="hudCombo"></div>
       </div>
       <div class="meta">
-        <div class="lives" id="hudLives"></div>
-        <div class="shotn" id="shotN">SHOT 1 / 25</div>
+        <div class="shotn" id="shotN">SHOT 1 / 17</div>
       </div>
     </div>
     <div class="brackets"><i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br br2"></i></div>
@@ -328,7 +332,7 @@ const CONFIG = {
       <div class="focus" id="focus"></div>
       <div class="judge" id="judge"></div>
     </div>
-    <div class="hint" id="hint">Tap when the ring lines up to pull focus</div>
+    <div class="hint" id="hint">Tap when the ring lines up — the sharper your focus, the higher the score</div>
     <div class="flash" id="flash"></div>
   </section>
 
@@ -337,6 +341,7 @@ const CONFIG = {
     <div class="final">
       <div class="lbl">YOUR SCORE</div>
       <div class="val" id="finalScore">0</div>
+      <div class="acc" id="accLine"></div>
       <div class="best" id="bestLine"></div>
     </div>
     <div class="share-card"><canvas id="card" width="540" height="960"></canvas></div>
@@ -458,41 +463,38 @@ const Game = (() => {
   const focusEl=document.getElementById('focus'), judgeEl=document.getElementById('judge'),
         photoEl=document.getElementById('photo');
   const TARGET=150, START=475;
-  let dia,speed,score,combo,lives,running,lastT,raf,pIndex,captured;
+  const ROUNDS = CONFIG.rounds || CONFIG.photoCount;   // fixed & fair: same shots for everyone
+  const TOL=60;                                        // px off target where the shot scores 0
+  let dia,speed,score,streak,running,lastT,raf,pIndex,shotNo,captured,locked;
 
-  function setLives(n){
-    hudLives.innerHTML='';
-    for(let i=0;i<3;i++){
-      const s=document.createElementNS('http://www.w3.org/2000/svg','svg');
-      s.setAttribute('viewBox','0 0 24 24'); s.classList.add('life'); if(i>=n)s.classList.add('lost');
-      s.innerHTML='<path fill="'+CONFIG.accent+'" d="M9 3l-1.5 2H4a2 2 0 00-2 2v11a2 2 0 002 2h16a2 2 0 002-2V7a2 2 0 00-2-2h-3.5L15 3H9zm3 5a5 5 0 110 10 5 5 0 010-10z"/>';
-      hudLives.appendChild(s);
-    }
-  }
   function setPhoto(i){
     photoEl.style.transition='none';
     photoEl.style.filter='blur(11px) brightness(.6) saturate(.9)';   // blurred = out of focus
     photoEl.style.transform='scale(1.05) translateZ(0)';
     photoEl.style.backgroundImage='url('+PHOTOS[i]+')';
-    shotN.textContent='SHOT '+(i+1)+' / '+CONFIG.photoCount;
   }
-  function develop(){ // snap into focus = captured (blur toggles instantly = crisp; only scale eases)
+  function develop(){ // snap into focus = captured (instant crisp; only scale eases)
     photoEl.style.transition='transform .25s ease-out';
     photoEl.style.filter='blur(0px) brightness(1) saturate(1.05)';
     photoEl.style.transform='scale(1) translateZ(0)';
   }
+  function hud(){
+    hudScore.textContent=score;
+    shotN.textContent='SHOT '+Math.min(shotNo+1,ROUNDS)+' / '+ROUNDS;
+    pfill.style.width=(shotNo/ROUNDS*100)+'%';
+  }
   function start(){
-    dia=START; speed=235; score=0; combo=0; lives=3; running=true; lastT=0;
-    pIndex=0; captured=PHOTOS[0];
-    hudScore.textContent='0'; hudCombo.textContent=''; setLives(3);
-    hint.style.opacity=1; setPhoto(0); show('game');
+    dia=START; speed=230; score=0; streak=0; running=true; lastT=0; locked=false;
+    shotNo=0; pIndex=0; captured=PHOTOS[0];
+    hudCombo.textContent=''; hud(); hint.style.opacity=1;
+    setPhoto(0); show('game');
     cancelAnimationFrame(raf); raf=requestAnimationFrame(loop);
   }
   function loop(t){
     if(!running)return; if(!lastT)lastT=t;
     const dt=Math.min((t-lastT)/1000,.05); lastT=t;
     dia-=speed*dt;
-    if(dia<=46) miss(true);
+    if(dia<=46) resolve(99,true);            // ring collapsed without a tap = missed shot
     focusEl.style.transform='translate(-50%,-50%) scale('+(Math.max(dia,46)/START)+')';
     raf=requestAnimationFrame(loop);
   }
@@ -505,51 +507,62 @@ const Game = (() => {
   }
   function flashFX(){ flash.style.transition='none'; flash.style.opacity='.85';
     requestAnimationFrame(()=>{ flash.style.transition='opacity .4s'; flash.style.opacity='0'; }); }
-  function nextPhoto(){
+
+  // Score one shot purely on timing accuracy (0–100). Every shot resolves; nobody loses turns.
+  function resolve(diff, timeout){
+    if(!running||locked)return; hint.style.opacity=0; locked=true;
+    let pts, label, color;
+    if(timeout || diff>=TOL){
+      pts=0; label='MISSED'; color=CONFIG.accent2; streak=0;
+      document.querySelector('.stage').animate(
+        [{transform:'translateX(0)'},{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(0)'}],{duration:160});
+    } else {
+      pts = diff<5 ? 100 : Math.round(100*(1-diff/TOL));
+      if(diff<6){ label='PERFECT'; color='#fff'; flashFX(); }
+      else if(diff<16){ label='SHARP'; color='#fff'; }
+      else { label='SOFT'; color='#dcd7c9'; }
+      develop(); captured=PHOTOS[pIndex];
+      streak = diff<16 ? streak+1 : 0;
+    }
+    score+=pts;
+    judge(pts>0 ? label+'  +'+pts : label, color);
+    hudCombo.textContent = streak>1 ? ('🔥 '+streak+' sharp in a row') : '';
+    nextShot();
+  }
+  function nextShot(){
+    shotNo++; hud();
+    if(shotNo>=ROUNDS){ return end(); }
     pIndex=(pIndex+1)%CONFIG.photoCount;
-    setTimeout(()=>{ if(running) setPhoto(pIndex); }, 280);
+    speed=Math.min(speed+9,540);             // ramps up — same curve for everyone
+    dia=START;
+    setTimeout(()=>{ if(running && shotNo<ROUNDS){ setPhoto(pIndex); locked=false; } }, 260);
   }
-  function tap(){
-    if(!running)return; hint.style.opacity=0;
-    const diff=Math.abs(dia-TARGET)/2;
-    if(diff<7){ hit(100,'PERFECT!',CONFIG.accent); flashFX(); develop(); captured=PHOTOS[pIndex]; nextPhoto(); }
-    else if(diff<18){ hit(60,'NICE',CONFIG.accent); develop(); captured=PHOTOS[pIndex]; nextPhoto(); }
-    else if(diff<32){ hit(30,'SOFT','#dcd7c9'); combo=0; develop(); captured=PHOTOS[pIndex]; nextPhoto(); }
-    else { miss(false); }
+  function end(){
+    running=false; cancelAnimationFrame(raf);
+    const acc=Math.round(score/(ROUNDS*100)*100);   // % of a perfect run
+    setTimeout(()=>overScreen(score, captured, acc), 380);
   }
-  function hit(base,txt,color){
-    combo++; const mult=1+Math.floor(combo/3)*0.25;
-    score+=Math.round(base*mult); hudScore.textContent=score;
-    hudCombo.textContent= combo>1 ? ('🔥 '+combo+' in a row  ×'+mult.toFixed(2)) : '';
-    judge(txt,color); speed=Math.min(speed+10,620); dia=START;
-  }
-  function miss(timeout){
-    combo=0; hudCombo.textContent=''; lives--; setLives(lives);
-    document.querySelector('.stage').animate(
-      [{transform:'translateX(0)'},{transform:'translateX(-9px)'},{transform:'translateX(9px)'},{transform:'translateX(0)'}],{duration:180});
-    judge(timeout?'BLURRED':'MISSED',CONFIG.accent2); dia=START;
-    if(lives<=0) end();
-  }
-  function end(){ running=false; cancelAnimationFrame(raf);
-    setTimeout(()=>overScreen(score, captured), 360); }
-  document.getElementById('game').addEventListener('pointerdown', e=>{ e.preventDefault(); tap(); });
+  document.getElementById('game').addEventListener('pointerdown', e=>{ e.preventDefault();
+    if(running) resolve(Math.abs(dia-TARGET)/2, false); });
   return { start };
 })();
 
 /* ===================== GAME OVER + CARD ===================== */
-let lastScore=0, lastPhoto=null;
+let lastScore=0, lastPhoto=null, lastAcc=0;
 function bestScore(){ return +(localStorage.getItem('cts_best')||0); }
-function overScreen(s, photoSrc){
-  lastScore=s; lastPhoto=photoSrc;
+function rating(a){ return a>=95?'LEGENDARY EYE': a>=85?'PRO SHOOTER': a>=70?'SHARP SHOOTER': a>=50?'GETTING THERE':'KEEP SHOOTING'; }
+function overScreen(s, photoSrc, acc){
+  lastScore=s; lastPhoto=photoSrc; lastAcc=acc;
   finalScore.textContent=s;
+  accLine.innerHTML='ACCURACY <b>'+acc+'%</b> · '+rating(acc);
   const best=bestScore();
   if(s>best){ localStorage.setItem('cts_best',s); bestLine.textContent='🎉 New personal best!'; }
   else bestLine.textContent='Your best: '+best;
   const saved=localStorage.getItem('cts_name'); if(saved) playerName.value=saved;
-  drawCard(s, photoSrc); show('over'); Board.render(s,false);
+  drawCard(s, photoSrc, acc); show('over'); Board.render(s,false);
 }
 
-function drawCard(score, photoSrc){
+function drawCard(score, photoSrc, acc){
   const c=document.getElementById('card'), x=c.getContext('2d'), W=c.width, H=c.height;
   const paint=()=>{
     // dark gradient base
@@ -565,16 +578,17 @@ function drawCard(score, photoSrc){
     x.font='italic 34px Georgia'; x.fillText(CONFIG.wordmark, W/2, 110);
     x.fillStyle=CONFIG.accent; x.font='600 15px -apple-system';
     x.fillText('C A P T U R E   T H E   S H O T', W/2, 142);
-    // score
-    x.fillStyle='rgba(255,255,255,.65)'; x.font='600 22px -apple-system'; x.fillText('I SCORED', W/2, H*0.50);
-    x.fillStyle=CONFIG.accent; x.font='800 150px -apple-system,Helvetica'; x.fillText(String(score), W/2, H*0.50+130);
+    // score + accuracy
+    x.fillStyle='rgba(255,255,255,.6)'; x.font='600 22px -apple-system'; x.fillText('I SCORED', W/2, 466);
+    x.fillStyle='#fff'; x.font='800 148px -apple-system,Helvetica'; x.fillText(String(score), W/2, 596);
+    x.fillStyle='#fff'; x.font='700 26px -apple-system'; x.fillText(acc+'% ACCURACY · '+rating(acc), W/2, 646);
     // challenge
-    x.fillStyle='#fff'; x.font='700 30px -apple-system'; x.fillText('Can you beat me?', W/2, H*0.70);
+    x.fillStyle='#fff'; x.font='700 30px -apple-system'; x.fillText('Can you beat me?', W/2, 724);
     x.fillStyle='rgba(255,255,255,.78)'; x.font='400 21px -apple-system';
-    wrap(x, CONFIG.prizeRule, W/2, H*0.755, 28, W-120);
+    wrap(x, CONFIG.prizeRule, W/2, 764, 28, W-120);
     // CTA
-    x.fillStyle=CONFIG.accent; x.font='800 28px -apple-system';
-    x.fillText('Tag '+CONFIG.instagram+' to win', W/2, H*0.90);
+    x.fillStyle='#fff'; x.font='800 28px -apple-system';
+    x.fillText('Tag '+CONFIG.instagram+' to win', W/2, 874);
   };
   // composite the captured photo behind everything when it's safe (deployed, or a placeholder dataURL)
   const safe = !photoSrc ? false : (photoSrc.startsWith('data:') || location.protocol!=='file:');
@@ -601,7 +615,7 @@ async function shareCard(){
     const file=new File([blob],'laith-visions-score.png',{type:'image/png'});
     if(navigator.canShare && navigator.canShare({files:[file]})){
       try{ await navigator.share({files:[file],
-        text:`I scored ${lastScore} on Laith Visions — Capture the Shot! Beat me & win a free session ${CONFIG.instagram}`}); return;
+        text:`I scored ${lastScore} (${lastAcc}% accuracy) on Laith Visions — Capture the Shot! Beat me & win a free session ${CONFIG.instagram}`}); return;
       }catch(e){}
     }
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
