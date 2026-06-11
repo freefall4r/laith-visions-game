@@ -33,9 +33,14 @@ const CONFIG = {
   prizeRule:   "Highest score by June 30 wins a FREE session with Laith Visions.",
   monthLabel:  "JUNE",
 
-  // --- Supabase (LIVE global leaderboard). Leave blank to use on-device scores. ---
-  supabaseUrl: "",
-  supabaseKey: "",
+  // --- Firebase (LIVE global leaderboard). Paste your web-app config below.
+  //     Leave projectId "" to use on-device scores. (These keys are safe to be public.) ---
+  firebase: {
+    apiKey:     "",
+    authDomain: "",
+    projectId:  "",     // <- the field that switches the global leaderboard ON
+    appId:      "",
+  },
 };
 </script>
 
@@ -327,6 +332,7 @@ const CUR_MONTH=MN[_now.getMonth()];
 const CUR_MONTH_TITLE=CUR_MONTH.charAt(0)+CUR_MONTH.slice(1).toLowerCase();
 const MONTH_START=new Date(_now.getFullYear(),_now.getMonth(),1).toISOString();
 const MONTH_START_MS=Date.parse(MONTH_START);
+const CUR_YM=`${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}`; // e.g. "2026-06"
 CONFIG.monthLabel=CUR_MONTH;
 CONFIG.prizeRule=`Top score in ${CUR_MONTH_TITLE} wins a FREE session with ${CONFIG.wordmark}. Resets the 1st.`;
 
@@ -555,23 +561,35 @@ async function shareCard(){
 
 /* ===================== LEADERBOARD ===================== */
 const Board = (() => {
-  let sb=null;
-  if(CONFIG.supabaseUrl && CONFIG.supabaseKey){
-    const s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-    s.onload=()=>{ sb=window.supabase.createClient(CONFIG.supabaseUrl,CONFIG.supabaseKey); };
-    document.head.appendChild(s);
+  let db=null;
+  const fcfg=CONFIG.firebase||{};
+  if(fcfg.projectId){
+    loadFirebase()
+      .then(()=>{ firebase.initializeApp(fcfg); db=firebase.firestore(); })
+      .catch(e=>console.warn('Firebase unavailable — using on-device scores', e));
+  }
+  function loadFirebase(){
+    return new Promise((res,rej)=>{
+      const base='https://www.gstatic.com/firebasejs/10.12.2/';
+      const s1=document.createElement('script'); s1.src=base+'firebase-app-compat.js';
+      s1.onload=()=>{ const s2=document.createElement('script'); s2.src=base+'firebase-firestore-compat.js';
+        s2.onload=res; s2.onerror=rej; document.head.appendChild(s2); };
+      s1.onerror=rej; document.head.appendChild(s1);
+    });
   }
   function local(){ try{ return JSON.parse(localStorage.getItem('cts_board')||'[]'); }catch(e){ return []; } }
-  function saveLocal(a){ localStorage.setItem('cts_board', JSON.stringify(a.slice(0,50))); }
+  function saveLocal(a){ localStorage.setItem('cts_board', JSON.stringify(a.slice(0,200))); }
   async function fetchTop(){
-    if(sb){ const {data,error}=await sb.from('scores').select('name,score')
-        .gte('created_at',MONTH_START).order('score',{ascending:false}).limit(20);
-      if(!error&&data) return data; }
+    if(db){ try{
+      const snap=await db.collection('scores').where('ym','==',CUR_YM).get();   // this month only
+      const rows=[]; snap.forEach(d=>{ const v=d.data(); rows.push({name:v.name,score:v.score}); });
+      return rows.sort((a,b)=>b.score-a.score).slice(0,20);
+    }catch(e){ console.warn(e); } }
     return local().filter(r=>(r.t||0)>=MONTH_START_MS).sort((a,b)=>b.score-a.score).slice(0,20);
   }
   async function submit(name,score){ name=(name||'Anon').slice(0,16);
-    if(sb){ try{ await sb.from('scores').insert({name,score}); }catch(e){} }
+    if(db){ try{ await db.collection('scores').add({ name, score, ym:CUR_YM,
+      created: firebase.firestore.FieldValue.serverTimestamp() }); }catch(e){ console.warn(e); } }
     const a=local(); a.push({name,score,t:Date.now()}); saveLocal(a);
   }
   async function render(myScore,fromHome){
