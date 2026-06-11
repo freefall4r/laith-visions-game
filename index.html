@@ -332,7 +332,7 @@ const CONFIG = {
       <div class="focus" id="focus"></div>
       <div class="judge" id="judge"></div>
     </div>
-    <div class="hint" id="hint">Tap when the ring lines up — the sharper your focus, the higher the score</div>
+    <div class="hint" id="hint">Tap as the ring meets the circle — don't let it slip past, or you lose points</div>
     <div class="flash" id="flash"></div>
   </section>
 
@@ -494,7 +494,7 @@ const Game = (() => {
     if(!running)return; if(!lastT)lastT=t;
     const dt=Math.min((t-lastT)/1000,.05); lastT=t;
     dia-=speed*dt;
-    if(dia<=46) resolve(99,true);            // ring collapsed without a tap = missed shot
+    if(dia<=46) resolve(0,true);             // ring collapsed without a tap = blurred shot
     focusEl.style.transform='translate(-50%,-50%) scale('+(Math.max(dia,46)/START)+')';
     raf=requestAnimationFrame(loop);
   }
@@ -508,24 +508,31 @@ const Game = (() => {
   function flashFX(){ flash.style.transition='none'; flash.style.opacity='.85';
     requestAnimationFrame(()=>{ flash.style.transition='opacity .4s'; flash.style.opacity='0'; }); }
 
-  // Score one shot purely on timing accuracy (0–100). Every shot resolves; nobody loses turns.
-  function resolve(diff, timeout){
+  // Score one shot on timing. Tap early or in-focus = points (0–100).
+  // Cross PAST the focal point (overshoot) or let it blur out = NEGATIVE points.
+  function resolve(d, timeout){
     if(!running||locked)return; hint.style.opacity=0; locked=true;
-    let pts, label, color;
-    if(timeout || diff>=TOL){
-      pts=0; label='MISSED'; color=CONFIG.accent2; streak=0;
-      document.querySelector('.stage').animate(
-        [{transform:'translateX(0)'},{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(0)'}],{duration:160});
-    } else {
-      pts = diff<5 ? 100 : Math.round(100*(1-diff/TOL));
-      if(diff<6){ label='PERFECT'; color='#fff'; flashFX(); }
-      else if(diff<16){ label='SHARP'; color='#fff'; }
+    const m = Math.abs(d-TARGET)/2;     // px off the perfect focal point
+    const overshot = d < TARGET;        // ring crossed past the sharp point
+    let pts, label, color, good=false;
+    if(timeout){
+      pts=-60; label='BLURRED'; color=CONFIG.accent2;          // never tapped → fully out of focus
+    } else if(!overshot || m<16){
+      pts = m<5 ? 100 : Math.max(0, Math.round(100*(1-m/TOL)));  // approaching / in focus
+      if(m<6){ label='PERFECT'; color='#fff'; flashFX(); }
+      else if(m<16){ label='SHARP'; color='#fff'; }
       else { label='SOFT'; color='#dcd7c9'; }
-      develop(); captured=PHOTOS[pIndex];
-      streak = diff<16 ? streak+1 : 0;
+      good = pts>0;
+    } else {
+      pts = -Math.max(4, Math.round(60*Math.min(1,(m-16)/40)));  // overshot → penalty, worse the further past
+      label='OVERSHOT'; color=CONFIG.accent2;
     }
+    if(good){ develop(); captured=PHOTOS[pIndex]; streak = m<16 ? streak+1 : 0; }
+    else { streak=0;
+      document.querySelector('.stage').animate(
+        [{transform:'translateX(0)'},{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(0)'}],{duration:160}); }
     score+=pts;
-    judge(pts>0 ? label+'  +'+pts : label, color);
+    judge(pts>0 ? label+'  +'+pts : (pts<0 ? label+'  '+pts : label), color);
     hudCombo.textContent = streak>1 ? ('🔥 '+streak+' sharp in a row') : '';
     nextShot();
   }
@@ -543,7 +550,7 @@ const Game = (() => {
     setTimeout(()=>overScreen(score, captured, acc), 380);
   }
   document.getElementById('game').addEventListener('pointerdown', e=>{ e.preventDefault();
-    if(running) resolve(Math.abs(dia-TARGET)/2, false); });
+    if(running) resolve(dia, false); });
   return { start };
 })();
 

@@ -1,6 +1,6 @@
 /* Capture the Shot — service worker (offline + fast loads).
    Bump CACHE when you change cached assets. */
-const CACHE = 'cts-v2';
+const CACHE = 'cts-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-180.png'];
 
 self.addEventListener('install', e => {
