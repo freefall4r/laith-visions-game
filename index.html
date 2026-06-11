@@ -76,7 +76,7 @@ const CONFIG = {
   .hero-grad{ position:absolute; inset:0; z-index:1; pointer-events:none;
     background:linear-gradient(180deg, rgba(10,10,11,.55) 0%, rgba(10,10,11,.08) 30%,
       rgba(10,10,11,.5) 64%, rgba(10,10,11,.97) 100%); }
-  .grain{ position:absolute; inset:0; z-index:2; pointer-events:none; opacity:.06; mix-blend-mode:overlay;
+  .grain{ position:absolute; inset:0; z-index:2; pointer-events:none; opacity:.05;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
   .frame{ position:absolute; inset:14px; z-index:3; pointer-events:none; border:1px solid rgba(255,255,255,.3); }
   .land{ position:relative; z-index:4; display:flex; flex-direction:column; height:100%;
@@ -150,8 +150,8 @@ const CONFIG = {
   /* ---------- GAME ---------- */
   #game{ padding:0; }
   #photo{ position:absolute; inset:0; background-size:cover; background-position:center;
-          filter:blur(16px) brightness(.62) saturate(.85); transform:scale(1.08);
-          transition:filter .12s linear, transform .12s linear; z-index:0; }
+          filter:blur(11px) brightness(.6) saturate(.9); transform:scale(1.05) translateZ(0);
+          transition:transform .25s ease-out; z-index:0; will-change:transform; }
   #photoTint{ position:absolute; inset:0; z-index:1; pointer-events:none;
     background:linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.15) 40%, rgba(0,0,0,.55)); }
   .hud{ position:absolute; top:0; left:0; right:0; z-index:6;
@@ -172,8 +172,8 @@ const CONFIG = {
   .target::before,.target::after{ content:""; position:absolute; background:var(--accent);
        width:2px; height:14px; left:50%; transform:translateX(-50%); }
   .target::before{ top:-9px } .target::after{ bottom:-9px }
-  .focus{ border:3px solid #fff; box-shadow:0 0 26px rgba(255,255,255,.35),
-          0 0 26px rgba(255,255,255,.4) inset; }
+  .focus{ width:475px; height:475px; border:3px solid #fff; will-change:transform;
+          box-shadow:0 0 26px rgba(255,255,255,.35), 0 0 26px rgba(255,255,255,.4) inset; }
   .brackets{ position:absolute; inset:20px; z-index:5; pointer-events:none; }
   .br{ position:absolute; width:28px; height:28px; border:2px solid rgba(255,255,255,.4); }
   .br.tl{ top:0; left:0; border-right:none; border-bottom:none }
@@ -420,15 +420,15 @@ const Game = (() => {
   }
   function setPhoto(i){
     photoEl.style.transition='none';
-    photoEl.style.filter='blur(16px) brightness(.62) saturate(.85)';
-    photoEl.style.transform='scale(1.08)';
+    photoEl.style.filter='blur(11px) brightness(.6) saturate(.9)';   // blurred = out of focus
+    photoEl.style.transform='scale(1.05) translateZ(0)';
     photoEl.style.backgroundImage='url('+PHOTOS[i]+')';
     shotN.textContent='SHOT '+(i+1)+' / '+CONFIG.photoCount;
   }
-  function develop(){ // snap into focus = captured
-    photoEl.style.transition='filter .18s ease-out, transform .25s ease-out';
+  function develop(){ // snap into focus = captured (blur toggles instantly = crisp; only scale eases)
+    photoEl.style.transition='transform .25s ease-out';
     photoEl.style.filter='blur(0px) brightness(1) saturate(1.05)';
-    photoEl.style.transform='scale(1)';
+    photoEl.style.transform='scale(1) translateZ(0)';
   }
   function start(){
     dia=START; speed=235; score=0; combo=0; lives=3; running=true; lastT=0;
@@ -442,7 +442,7 @@ const Game = (() => {
     const dt=Math.min((t-lastT)/1000,.05); lastT=t;
     dia-=speed*dt;
     if(dia<=46) miss(true);
-    focusEl.style.width=focusEl.style.height=Math.max(dia,46)+'px';
+    focusEl.style.transform='translate(-50%,-50%) scale('+(Math.max(dia,46)/START)+')';
     raf=requestAnimationFrame(loop);
   }
   function judge(txt,color){
